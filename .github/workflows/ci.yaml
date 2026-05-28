@@ -1,0 +1,94 @@
+name: Auto Release (Semantic Versioning)
+
+on:
+  push:
+    branches:
+      - production
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: tag
+        run: |
+          git fetch --tags
+          latest=$(git tag --sort=-v:refname | head -n 1)
+
+          if [ -z "$latest" ]; then
+            latest="v0.0.0"
+          fi
+
+          echo "latest=$latest" >> $GITHUB_OUTPUT
+
+      - name: Determine version bump
+        id: bump
+        run: |
+          range="${{ steps.tag.outputs.latest }}..HEAD"
+
+          commits=$(git log $range --pretty=%B)
+
+          echo "Commits since last tag:"
+          echo "$commits"
+
+          bump="patch"
+
+          if echo "$commits" | grep -q "BREAKING CHANGE"; then
+            bump="major"
+          elif echo "$commits" | grep -q "feat!"; then
+            bump="major"
+          elif echo "$commits" | grep -q "^feat"; then
+            bump="minor"
+          else
+            bump="patch"
+          fi
+
+          echo "bump=$bump" >> $GITHUB_OUTPUT
+
+      - name: Compute new version
+        id: version
+        run: |
+          latest="${{ steps.tag.outputs.latest }}"
+          version=${latest#v}
+
+          IFS='.' read -r major minor patch <<< "$version"
+
+          bump="${{ steps.bump.outputs.bump }}"
+
+          if [ "$bump" = "major" ]; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+          elif [ "$bump" = "minor" ]; then
+            minor=$((minor + 1))
+            patch=0
+          else
+            patch=$((patch + 1))
+          fi
+
+          new="v$major.$minor.$patch"
+          echo "new=$new" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git tag ${{ steps.version.outputs.new }}
+          git push origin ${{ steps.version.outputs.new }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.new }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
