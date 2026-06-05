@@ -107,7 +107,7 @@ jobs:
       - name: Sanitize image name
         id: sanitize
         run: |
-          name=$(echo "${{ github.repository }}" | sed 's/-*$//')
+          name=$(echo "${{ github.repository }}" | sed 's/-*$//' | tr '[:upper:]' '[:lower:]')
           echo "name=$name" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
