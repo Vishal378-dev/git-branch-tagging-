@@ -1,0 +1,34 @@
+name: Promote to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to promote (e.g., v1.5.0)'
+        required: true
+
+permissions:
+  packages: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sanitize image name
+        id: sanitize
+        run: |
+          name=$(echo "${{ github.repository }}" | sed 's/-*$//' | tr '[:upper:]' '[:lower:]')
+          echo "name=$name" >> $GITHUB_OUTPUT
+
+      - name: Promote image to release
+        run: |
+          docker buildx imagetools create \
+            ghcr.io/${{ steps.sanitize.outputs.name }}:${{ inputs.version }} \
+            --tag ghcr.io/${{ steps.sanitize.outputs.name }}:release
