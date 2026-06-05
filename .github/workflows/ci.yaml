@@ -104,10 +104,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Sanitize image name
+        id: sanitize
+        run: |
+          name=$(echo "${{ github.repository }}" | sed 's/-*$//')
+          echo "name=$name" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.new }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ steps.sanitize.outputs.name }}:${{ steps.version.outputs.new }}
+            ghcr.io/${{ steps.sanitize.outputs.name }}:latest
