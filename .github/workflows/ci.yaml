@@ -114,6 +114,4 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: |
-            ghcr.io/${{ steps.sanitize.outputs.name }}:${{ steps.version.outputs.new }}
-            ghcr.io/${{ steps.sanitize.outputs.name }}:latest
+          tags: ghcr.io/${{ steps.sanitize.outputs.name }}:${{ steps.version.outputs.new }}
