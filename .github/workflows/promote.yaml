@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -28,8 +31,24 @@ jobs:
           name=$(echo "${{ github.repository }}" | sed 's/-*$//' | tr '[:upper:]' '[:lower:]')
           echo "name=$name" >> $GITHUB_OUTPUT
 
-      - name: Promote image to release
+      - name: Check if source image exists
+        id: check
         run: |
-          docker buildx imagetools create \
-            ghcr.io/${{ steps.sanitize.outputs.name }}:${{ inputs.version }} \
-            --tag ghcr.io/${{ steps.sanitize.outputs.name }}:release
+          img="ghcr.io/${{ steps.sanitize.outputs.name }}:${{ inputs.version }}"
+          echo "Checking: $img"
+          docker buildx imagetools inspect "$img" > /dev/null 2>&1 && echo "exists=true" >> $GITHUB_OUTPUT || echo "exists=false" >> $GITHUB_OUTPUT
+
+      - name: Promote image to release
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          src="ghcr.io/${{ steps.sanitize.outputs.name }}:${{ inputs.version }}"
+          dst="ghcr.io/${{ steps.sanitize.outputs.name }}:release"
+          echo "Promoting $src -> $dst"
+          docker buildx imagetools create "$src" --tag "$dst"
+
+      - name: Error - image not found
+        if: steps.check.outputs.exists != 'true'
+        run: |
+          echo "::error::Image ghcr.io/${{ steps.sanitize.outputs.name }}:${{ inputs.version }} not found on GHCR."
+          echo "::error::Run the CI workflow on production first to push a versioned image."
+          exit 1
